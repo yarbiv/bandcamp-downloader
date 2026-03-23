@@ -164,6 +164,12 @@ def main() -> int:
         default = False,
         help = 'Display a summary of the status of every item at the end.',
     )
+    parser.add_argument(
+        '--ntfy-topic',
+        type=str,
+        default=None,
+        help='ntfy.sh topic to push notifications to when a download completes.'
+    )
     parser.add_argument('--verbose', '-v', action='count', default = 0)
     args = parser.parse_args()
 
@@ -175,6 +181,7 @@ def main() -> int:
     CONFIG['OUTPUT_DIR'] = os.path.normcase(args.directory)
     CONFIG['FILENAME_FORMAT'] = args.filename_format
     CONFIG['BROWSER'] = args.browser
+    CONFIG['NTFY_TOPIC'] = args.ntfy_topic
     if args.download_since:
         CONFIG['SINCE'] = datetime.datetime.strptime(args.download_since, '%Y-%m-%d')
     if args.download_until:
@@ -198,6 +205,7 @@ def main() -> int:
     if CONFIG['VERBOSE']: print(args)
     if CONFIG['FORCE']: print('WARNING: --force flag set, existing files will be overwritten.')
     CONFIG['COOKIE_JAR'] = get_cookies()
+    check_cookie_expiry()
 
     items = get_items_for_user(args.username, args.include_hidden)
 
@@ -238,7 +246,7 @@ def main() -> int:
             extract_dir = os.path.join(os.path.dirname(zip), album_name)
             with zipfile.ZipFile(zip, 'r') as zip_file:
                 zip_file.extractall(extract_dir)
-            os.remove(zip)
+            # os.remove(zip)
 
 
     FAILED_STATUSES=['Error', 'Exception', 'Unavailable']
@@ -260,6 +268,32 @@ def main() -> int:
     print('Done.')
 
     return 0
+
+def check_cookie_expiry():
+    if not CONFIG['NTFY_TOPIC']:
+        return
+    
+    WARNING_DAYS = 30
+    TOMBSTONE = os.path.join(os.path.dirname(__file__), '.expiry_warned')
+    
+    if os.path.exists(TOMBSTONE):
+        warned_date = datetime.datetime.fromtimestamp(os.path.getmtime(TOMBSTONE))
+        if (datetime.datetime.now() - warned_date).days < 1:
+            return  # already warned today
+    
+    cj = CONFIG['COOKIE_JAR']
+    for cookie in cj:
+        if cookie.name == 'identity' and cookie.expires:
+            expiry = datetime.datetime.fromtimestamp(cookie.expires)
+            days_left = (expiry - datetime.datetime.now()).days
+            if days_left < WARNING_DAYS:
+                requests.post(
+                    f"https://ntfy.sh/{CONFIG['NTFY_TOPIC']}",
+                    data=f"⚠️  Bandcamp cookie expiring in {days_left} days! Re-sync the cookie soon."
+                )
+                # Write tombstone so we don't spam
+                open(TOMBSTONE, 'w').close()
+            break
 
 # Fetch item data for the given user via the bandcamp API, then return the
 # 'items' subobject, with 'redownload_url' and 'filename' fields added to each.
@@ -566,6 +600,11 @@ def download_file(_url : str, _album : dict, _attempt : int = 1) -> bool:
         if expected_size != actual_size:
             raise IOError('Incomplete read. {} bytes read, {} bytes expected'.format(actual_size, expected_size))
         _album['download_status'] = 'Downloaded'
+        if CONFIG['NTFY_TOPIC']:
+            requests.post(
+                f"https://ntfy.sh/{CONFIG['NTFY_TOPIC']}",
+                data=f"{_album['band_name']} - {_album['item_title']} is now available on Navidrome"
+            )
         return True
     except IOError as e:
         # HTTP 403 Seems to only show up if bandcamp won't let you download the album again.
