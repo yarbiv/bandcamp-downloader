@@ -246,7 +246,7 @@ def main() -> int:
             extract_dir = os.path.join(os.path.dirname(zip), album_name)
             with zipfile.ZipFile(zip, 'r') as zip_file:
                 zip_file.extractall(extract_dir)
-            # os.remove(zip)
+            os.remove(zip)
 
 
     FAILED_STATUSES=['Error', 'Exception', 'Unavailable']
@@ -448,8 +448,14 @@ def add_item_file_paths(_items : dict):
 # Check if a file already exists at the given path that matches the given
 # metadata size string.
 # _download_size, if nonempty, should be of the form "[num]MB" or "[num]GB"
-def download_exists(_file_path : str, _download_size : str) -> bool:
+def download_exists(_file_path, _download_size):
     if not os.path.exists(_file_path):
+        # Check if extracted directory exists and is non-empty
+        zip_stem = re.search(r'\- (.+?)$', os.path.splitext(_file_path)[0])
+        if zip_stem:
+            extract_dir = os.path.join(os.path.dirname(_file_path), zip_stem.group(1))
+            if os.path.isdir(extract_dir) and os.listdir(extract_dir):
+                return True
         return False
     if CONFIG['FORCE']:
         if CONFIG['VERBOSE']: CONFIG['TQDM'].write('--force flag was given. Overwriting existing file at [{}].'.format(_file_path))
