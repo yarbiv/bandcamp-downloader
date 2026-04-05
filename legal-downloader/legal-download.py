@@ -13,7 +13,7 @@ def download(artist, album):
     torbox_api_key = os.getenv("TORBOX_API_KEY")
 
     cookie = login.get_cookie()
-    results = search.search_rutracker(args.artist, args.album, cookie)
+    results = search.search_rutracker(artist, album, cookie)
     magnet = search.get_magnet(results[0]["topic_id"])
     torrent_id = torbox.create_torrent(magnet, torbox_api_key).get("torrent_id")
     url = torbox.get_torrent_url(torrent_id, torbox_api_key)
