@@ -1,2 +1,4 @@
 bandcamp_downloader.egg-info/
 build/
+__pycache__/
+music/
