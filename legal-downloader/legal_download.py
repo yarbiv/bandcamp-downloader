@@ -15,8 +15,9 @@ def download(artist, album):
     torbox_api_key = os.getenv("TORBOX_API_KEY")
 
     cookie = login.get_cookie()
-    results = search.search_rutracker(artist, album, cookie)
-    magnet = search.get_magnet(results[0]["topic_id"])
+    result = search.search_rutracker(artist, album, cookie)
+    print(result)
+    magnet = search.get_magnet(result["topic_id"])
     torrent_id = torbox.create_torrent(magnet, torbox_api_key).get("torrent_id")
     url = torbox.get_torrent_url(torrent_id, torbox_api_key)
     torbox.download_and_extract_torrent(url)
@@ -31,7 +32,7 @@ def download(artist, album):
     # this is newline separated, so split it and check if the length is 1, then we drop the empty string
     album_artist_strings = [s for s in result.split("\n") if s]
     if len(album_artist_strings) == 1:
-        return album_artist_strings[0]
+        return f"{album_artist_strings[0]} ({result['pretty_size']})"
     elif len(album_artist_strings) == 0:
         raise Exception(f"Requested download ({album} by {artist}) failed to download or import.")
     else:
