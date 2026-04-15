@@ -28,8 +28,8 @@ def download(artist, album):
     # Check that beets actually managed to import the album
     #  beet ls -af '$album - $albumartist' 
     result = subprocess.check_output(["beet", "ls", "-af", "$album - $albumartist", album, artist], text=True)
-    # this is newline separated, so split it and check if the length is 1
-    album_artist_strings = result.split("\n")
+    # this is newline separated, so split it and check if the length is 1, then we drop the empty string
+    album_artist_strings = [s for s in result.split("\n") if s]
     if len(album_artist_strings) == 1:
         return album_artist_strings[0]
     elif len(album_artist_strings) == 0:
