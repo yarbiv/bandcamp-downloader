@@ -3,6 +3,7 @@ DOWNLOAD_TORRENT_URL = "https://api.torbox.app/v1/api/torrents/requestdl"
 
 import os
 import time
+import uuid
 
 import requests
 import zipfile
@@ -24,14 +25,17 @@ def download_and_extract_torrent(url, output_path=None):
     if output_path is None:
         output_path ="music/downloads/"
 
-    with open("download.zip", "wb") as f:
+    # UUID ensures multiple torrents don't clobber each other
+    file = f"download_{uuid.uuid4()}.zip"
+
+    with open(file, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
 
-    with zipfile.ZipFile("download.zip", "r") as zip_ref:
+    with zipfile.ZipFile(file, "r") as zip_ref:
         zip_ref.extractall(output_path)
     
     print(f"Torrent downloaded and extracted to {output_path}")
 
-    os.remove("download.zip")
+    os.remove(file)
 
