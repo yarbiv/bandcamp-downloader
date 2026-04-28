@@ -13,6 +13,7 @@ def get_cookie():
     SESSION.get("https://rutracker.org/forum/login.php")
     username = os.getenv("RU_USER")
     password = os.getenv("RU_PASS")
+    print(username, password)
 
     r = SESSION.post("https://rutracker.org/forum/login.php", data={
         "login_username": username,
