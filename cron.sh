@@ -9,4 +9,5 @@ set -e
     --ntfy-topic slA41wTTTJj924eb \
     yarbiv
 
-/root/bandcamp-downloader/.venv/bin/beet import -m /root/music/ -q /root/bandcamp-downloader/music/downloads
+# We handle the -m /root/music bit in configs.
+/root/bandcamp-downloader/.venv/bin/beet import -q /root/bandcamp-downloader/music/downloads
