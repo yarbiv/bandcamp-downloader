@@ -19,9 +19,18 @@ from concurrent.futures import ThreadPoolExecutor
 
 # These require pip installs
 from bs4 import BeautifulSoup, SoupStrainer
-from curl_cffi import requests
+from curl_cffi import requests as curl_requests
 import browser_cookie3
 from tqdm import tqdm
+
+import threading
+
+_thread_local = threading.local()
+
+def get_session():
+    if not hasattr(_thread_local, 'session'):
+        _thread_local.session = curl_requests.Session(impersonate='chrome')
+    return _thread_local.session
 
 USER_URL = 'https://bandcamp.com/{}'
 COLLECTION_POST_URL = 'https://bandcamp.com/api/fancollection/1/collection_items'
@@ -287,7 +296,7 @@ def check_cookie_expiry():
             expiry = datetime.datetime.fromtimestamp(cookie.expires)
             days_left = (expiry - datetime.datetime.now()).days
             if days_left < WARNING_DAYS:
-                requests.post(
+                curl_requests.post(
                     f"https://ntfy.sh/{CONFIG['NTFY_TOPIC']}",
                     data=f"⚠️  Bandcamp cookie expiring in {days_left} days! Re-sync the cookie soon."
                 )
@@ -305,7 +314,7 @@ def fetch_items(_hidden : bool, _user_id : str, _last_token : str, _count : int)
         'count' : _count,
         'older_than_token' : _last_token,
     }
-    response = requests.post(
+    response = get_session().post(
         url,
         data = json.dumps(payload),
         cookies = CONFIG['COOKIE_JAR'],
@@ -319,7 +328,7 @@ def fetch_items(_hidden : bool, _user_id : str, _last_token : str, _count : int)
 # Loads the given url and looks for the 'pagedata' div and, if found,
 # returns its 'data-blob' property decoded from json.
 def pagedata_for_url(_url : str) -> dict:
-    text = requests.get(_url, cookies = CONFIG['COOKIE_JAR']).text
+    text = get_session().get(_url, cookies = CONFIG['COOKIE_JAR']).text
     soup = BeautifulSoup(
         text,
         'html.parser',
@@ -522,6 +531,7 @@ def download_and_log_album(_album : dict):
 # to the file extension for this item, and the key 'downloaded' to whether
 # a file was successfully downloaded.
 def download_album(_album : dict):
+
     _album['downloaded'] = False
     _album['download_status'] = 'Error'
     if 'tralbum_type' in _album:
@@ -570,7 +580,7 @@ def download_file(_url : str, _album : dict, _attempt : int = 1) -> bool:
         _album['download_status'] = 'Skipped'
         return True
     try:
-        response = requests.get(
+        response = get_session().get(
                 _url,
                 cookies = CONFIG['COOKIE_JAR'],
                 impersonate='chrome',
@@ -600,14 +610,14 @@ def download_file(_url : str, _album : dict, _attempt : int = 1) -> bool:
         if CONFIG['VERBOSE'] >= 2: CONFIG['TQDM'].write('Album being saved to [{}]'.format(file_path))
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, 'wb') as fh:
-            for chunk in response.iter_content():
+            for chunk in response.iter_content(chunk_size=65536):
                 fh.write(chunk)
             actual_size = fh.tell()
         if expected_size != actual_size:
             raise IOError('Incomplete read. {} bytes read, {} bytes expected'.format(actual_size, expected_size))
         _album['download_status'] = 'Downloaded'
         if CONFIG['NTFY_TOPIC']:
-            requests.post(
+            get_session().post(
                 f"https://ntfy.sh/{CONFIG['NTFY_TOPIC']}",
                 data=f"{_album['band_name']} - {_album['item_title']} is now available on Navidrome"
             )
