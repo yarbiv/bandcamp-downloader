@@ -236,17 +236,14 @@ def main() -> int:
     CONFIG['TQDM'].close()
 
     if args.extract:
-        zips = [item['file_path'] + '.zip' for item in items.values() if item['extension'] == '.zip']
-        print(zips)
+        downloaded_zips = [item['file_path'] + '.zip' for item in items.values() if item['extension'] == '.zip' and item['downloaded']]
         if CONFIG['VERBOSE'] >=2:
-            print(zips)
-        for zip in zips:
+            print(downloaded_zips)
+        for zip in downloaded_zips:
             print(f'Extracting compressed archive: {zip}')
             if CONFIG['DRY_RUN']: continue
             album_name = re.search(r'\- (.+?)\.zip$', zip).group(1)
             extract_dir = os.path.join(os.path.dirname(zip), album_name)
-            if not os.path.exists(zip):
-                continue
             with zipfile.ZipFile(zip, 'r') as zip_file:
                 zip_file.extractall(extract_dir)
             os.remove(zip)
@@ -457,7 +454,7 @@ def download_exists(_file_path, _download_size):
         zip_stem = re.search(r'\- (.+?)$', os.path.splitext(_file_path)[0])
         if zip_stem:
             extract_dir = os.path.join(os.path.dirname(_file_path), zip_stem.group(1))
-            if os.path.isdir(extract_dir) and len(os.listdir(extract_dir)) > 0 and not os.listdir(extract_dir)[0].endswith('.zip'):
+            if os.path.isdir(extract_dir) and os.listdir(extract_dir):
                 return True
         return False
     if CONFIG['FORCE']:
